@@ -1,0 +1,2125 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice Detail Report Analyzer</title>
+    <!-- SheetJS CDN for parsing input Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- ExcelJS CDN for rich styling export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <!-- FileSaver CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #1e3a8a;
+            --primary-hover: #1e40af;
+            --success-color: #15803d;
+            --success-hover: #166534;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-color: #1e293b;
+            --border-color: #e2e8f0;
+            --header-bg: #1e3a8a;
+            --header-text: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        .app-header {
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            padding: 20px 24px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .app-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 4px;
+        }
+
+        .app-subtitle {
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .config-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            padding: 24px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .step-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        @media (max-width: 1024px) {
+            .step-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .step-item {
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .step-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--primary-color);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .filter-grid .full-width {
+            grid-column: span 2;
+        }
+
+        @media (max-width: 640px) {
+            .filter-grid {
+                grid-template-columns: 1fr;
+            }
+            .filter-grid .full-width {
+                grid-column: span 1;
+            }
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .input-with-btn {
+            display: flex;
+            gap: 6px;
+        }
+
+        .sap-multi-btn {
+            padding: 0 12px;
+            background-color: #e2e8f0;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .sap-multi-btn:hover {
+            background-color: #cbd5e1;
+        }
+
+        .date-range-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        input[type="file"], input[type="text"], input[type="date"], input[type="number"], select {
+            padding: 9px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 13px;
+            outline: none;
+            background: #ffffff;
+            width: 100%;
+        }
+
+        input[type="text"]:disabled {
+            background: #f1f5f9;
+            color: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        input[type="file"] {
+            cursor: pointer;
+        }
+
+        .hint-text {
+            font-size: 11px;
+            color: #94a3b8;
+        }
+
+        /* --- SD Scope Selector --- */
+        .scope-box {
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px dashed #cbd5e1;
+        }
+
+        .scope-options {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 6px;
+        }
+
+        .scope-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #1e293b;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .scope-option:hover {
+            border-color: #93c5fd;
+        }
+
+        .scope-option:has(input:checked) {
+            border-color: var(--primary-color);
+            background: #eff6ff;
+        }
+
+        .scope-option input {
+            cursor: pointer;
+        }
+
+        /* --- Mode Switcher Style --- */
+        .currency-mode-box {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .currency-mode-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #1e40af;
+            text-transform: uppercase;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .radio-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1e293b;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .radio-label input {
+            cursor: pointer;
+        }
+
+        /* --- Step 3 Toggle Box Styling --- */
+        .toggle-btn {
+            background-color: #e2e8f0;
+            color: #334155;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            border: 1px solid #cbd5e1;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .toggle-btn:hover {
+            background-color: #cbd5e1;
+        }
+
+        .setup-box {
+            background: #ffffff;
+            border: 1px dashed #cbd5e1;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 8px;
+            margin-bottom: 16px;
+        }
+
+        .tax-setup-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .tax-setup-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .setup-section-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #475569;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 4px;
+        }
+
+        .tax-rate-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 12px;
+        }
+
+        .action-bar {
+            display: flex;
+            gap: 12px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 16px;
+        }
+
+        button {
+            padding: 11px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border: none;
+        }
+
+        button.btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+            flex: 2;
+        }
+
+        button.btn-primary:hover {
+            background-color: var(--primary-hover);
+        }
+
+        button.btn-success {
+            background-color: var(--success-color);
+            color: white;
+            flex: 1;
+        }
+
+        button.btn-success:hover {
+            background-color: var(--success-hover);
+        }
+
+        button:disabled {
+            background-color: #cbd5e1 !important;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .summary-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-top: 4px solid var(--primary-color);
+            padding: 14px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .summary-card.transfer-card {
+            border-top-color: #d97706;
+            background-color: #fffbeb;
+        }
+
+        .summary-card .title {
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .summary-card .value {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-top: 4px;
+        }
+
+        .summary-card .sub-value {
+            font-size: 11px;
+            color: #64748b;
+            margin-top: 2px;
+        }
+
+        .summary-card.transfer-card .value {
+            color: #b45309;
+        }
+
+        .screen-selector {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            border: none;
+            background-color: #e2e8f0;
+            color: #475569;
+            font-weight: 700;
+            border-radius: 6px 6px 0 0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn:hover {
+            background-color: #cbd5e1;
+        }
+
+        .tab-btn.active {
+            background-color: var(--primary-color);
+            color: #ffffff;
+            border-bottom: 3px solid #3b82f6;
+        }
+
+        .table-card {
+            background: var(--card-bg);
+            border-radius: 0 12px 12px 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            padding: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .table-container {
+            overflow: auto;
+            max-height: 600px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        th {
+            background-color: var(--header-bg);
+            color: var(--header-text);
+            padding: 10px 8px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 8px;
+            border-bottom: 1px solid #f1f5f9;
+            border-right: 1px solid #f8fafc;
+        }
+
+        tr:nth-child(even) { background-color: #f8fafc; }
+        tr:hover { background-color: #f1f5f9; }
+
+        tr.total-row {
+            background-color: #e2e8f0;
+            font-weight: bold;
+            color: #dc2626 !important;
+            position: sticky;
+            bottom: 0;
+            z-index: 5;
+        }
+
+        .pivot-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .pivot-table th {
+            background-color: #1e3a8a !important;
+            color: #ffffff !important;
+            font-weight: 700;
+            padding: 12px 10px;
+            border: 1px solid #1e40af;
+        }
+
+        .pivot-table td {
+            padding: 10px 12px;
+            border: 1px solid #cbd5e1;
+        }
+
+        .pivot-subtotal-row {
+            background-color: #dbeafe !important;
+            font-weight: 700;
+            color: #1e3a8a !important;
+            border-top: 2px solid #3b82f6 !important;
+            border-bottom: 2px solid #3b82f6 !important;
+        }
+
+        .pivot-grandtotal-row {
+            background-color: #1e293b !important;
+            color: #ffffff !important;
+            font-weight: 800;
+            font-size: 13px;
+        }
+
+        .pivot-grandtotal-row td {
+            border-color: #475569 !important;
+        }
+
+        .text-center { text-align: center; }
+        .text-left { text-align: left; }
+        .text-right { text-align: right; }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #94a3b8;
+            font-size: 14px;
+        }
+
+        /* --- Badges --- */
+        .badge-tax {
+            background-color: #dcfce7;
+            color: #15803d;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+
+        .badge-deferred {
+            background-color: #fef3c7;
+            color: #b45309;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+
+        .badge-wht-found {
+            background-color: #dbeafe;
+            color: #1d4ed8;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+
+        .badge-wht-missing {
+            background-color: #fee2e2;
+            color: #b91c1c;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+
+        .badge-wht-none {
+            background-color: #f1f5f9;
+            color: #64748b;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .badge-no-sd {
+            background-color: #f1f5f9;
+            color: #94a3b8;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 11px;
+        }
+
+        .hide-col {
+            display: none !important;
+        }
+
+        /* --- SAP Multiple Selection Modal --- */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-card {
+            background: #ffffff;
+            border-radius: 12px;
+            width: 520px;
+            max-width: 90%;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            animation: modalPop 0.2s ease-out;
+        }
+        @keyframes modalPop {
+            from { transform: scale(0.95); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .modal-header {
+            background: var(--primary-color);
+            color: white;
+            padding: 14px 20px;
+            font-weight: bold;
+            font-size: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-close-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 0;
+        }
+        .modal-body {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .modal-body textarea {
+            width: 100%;
+            height: 240px;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: monospace;
+            resize: vertical;
+            outline: none;
+        }
+        .modal-body textarea:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.1);
+        }
+        .modal-footer {
+            padding: 12px 20px;
+            background: #f8fafc;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        /* --- SAP-style Selection Fields --- */
+        .sel-field {
+            position: relative;
+            flex: 1;
+            min-width: 0;
+        }
+        .sel-field input.multi {
+            background: #f0fdf4;
+            border-color: #86efac;
+            color: #166534;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .sap-multi-btn {
+            position: relative;
+        }
+        .sap-multi-btn.active {
+            background-color: #16a34a;
+            border-color: #15803d;
+            color: #ffffff;
+        }
+        .sap-multi-btn.active:hover {
+            background-color: #15803d;
+        }
+        .sap-multi-btn:disabled,
+        .sap-clear-btn:disabled {
+            background-color: #f1f5f9 !important;
+            color: #cbd5e1;
+            cursor: not-allowed;
+        }
+        .multi-badge {
+            position: absolute;
+            top: -7px;
+            right: -7px;
+            background: #dc2626;
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 700;
+            border-radius: 9px;
+            padding: 1px 6px;
+            line-height: 14px;
+        }
+        .sap-clear-btn {
+            padding: 0 10px;
+            background-color: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #94a3b8;
+        }
+        .sap-clear-btn:hover {
+            color: #dc2626;
+            border-color: #fca5a5;
+        }
+        .filter-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+        .btn-link {
+            background: none;
+            border: 1px solid #cbd5e1;
+            color: #475569;
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        .btn-link:hover {
+            background: #f1f5f9;
+        }
+
+        /* --- Modal extras --- */
+        .modal-card.wide {
+            width: 640px;
+        }
+        .modal-toolbar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .modal-toolbar button {
+            padding: 6px 12px;
+            font-size: 12px;
+            background: #e2e8f0;
+            color: #334155;
+        }
+        .modal-toolbar button:hover {
+            background: #cbd5e1;
+        }
+        .modal-count {
+            font-size: 12px;
+            color: #475569;
+            font-weight: 600;
+        }
+        .modal-count .dup {
+            color: #b45309;
+            font-weight: 500;
+        }
+        .modal-body textarea {
+            height: 320px;
+        }
+
+        /* --- Not-found report --- */
+        .filter-report {
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            font-size: 12px;
+            color: #7c2d12;
+        }
+        .filter-report-title {
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+        .filter-report-row {
+            display: flex;
+            gap: 8px;
+            align-items: baseline;
+            flex-wrap: wrap;
+            padding: 4px 0;
+            border-top: 1px dashed #fed7aa;
+        }
+        .filter-report-row:first-of-type {
+            border-top: none;
+        }
+        .filter-report-values {
+            font-family: monospace;
+            color: #9a3412;
+            word-break: break-all;
+            flex: 1;
+        }
+        .filter-report button {
+            padding: 2px 10px;
+            font-size: 11px;
+            background: #ffffff;
+            border: 1px solid #fdba74;
+            color: #9a3412;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="app-header">
+        <div class="app-title">Invoice Detail Report Analyzer <span id="appTitleScope">(SD Only)</span></div>
+        <div class="app-subtitle">อัปโหลดไฟล์ Excel เพื่อแสดงรายงานรายละเอียดใบแจ้งหนี้ ถอดภาษี VAT คำนวณ WHT และยอดเงินโอน</div>
+    </div>
+
+    <div class="config-card">
+        <div class="step-grid">
+            <!-- Step 1: Upload File + SD Scope -->
+            <div class="step-item">
+                <div class="step-label">Step 1: เลือกไฟล์ Excel</div>
+                <div class="form-group">
+                    <label for="excelFile">ไฟล์ Excel จากระบบ SAP</label>
+                    <input type="file" id="excelFile" accept=".xlsx, .xls">
+                    <span class="hint-text" id="scopeHint">* กรองเฉพาะรายการที่มี SD Document No. เท่านั้น</span>
+                </div>
+
+                <!-- NEW: SD Document Scope -->
+                <div class="scope-box">
+                    <label>ขอบเขตข้อมูล (SD Document No.)</label>
+                    <div class="scope-options">
+                        <label class="scope-option">
+                            <input type="radio" name="sdScope" value="SD_ONLY" checked onchange="updateSdScopeUI()">
+                            เฉพาะรายการที่มี SD Document No.
+                        </label>
+                        <label class="scope-option">
+                            <input type="radio" name="sdScope" value="ALL" onchange="updateSdScopeUI()">
+                            ทั้งหมด (มี และ ไม่มี SD Document No.)
+                        </label>
+                        <label class="scope-option">
+                            <input type="radio" name="sdScope" value="NON_SD" onchange="updateSdScopeUI()">
+                            เฉพาะรายการที่ไม่มี SD Document No.
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Advanced Filters -->
+            <div class="step-item">
+                <div class="step-label">Step 2: เงื่อนไขการคัดกรองข้อมูล (Filter Criteria - สไตล์ SAP Multiple Selection)</div>
+                <div class="filter-grid" id="filterGrid">
+                    <!-- ช่องกรองถูกสร้างอัตโนมัติจาก FILTER_FIELDS ใน script -->
+                </div>
+                <div class="filter-grid" style="margin-top: 12px;">
+                    <div class="form-group full-width">
+                        <label>Journal Entry Date (ช่วงวันที่ From - To)</label>
+                        <div class="date-range-group">
+                            <input type="date" id="filterDateFrom">
+                            <span style="font-size: 12px; color: #64748b; font-weight: bold;">ถึง</span>
+                            <input type="date" id="filterDateTo">
+                        </div>
+                    </div>
+                </div>
+                <div class="filter-footer">
+                    <span class="hint-text">* ช่องว่าง = ทั้งหมด · หลายค่า = เงื่อนไข IN · Copy คอลัมน์จาก Excel แล้ว Paste ลงช่องได้ทันที (หลายบรรทัด) หรือกด 📋</span>
+                    <button type="button" class="btn-link" onclick="clearAllFilters()">🗑 ล้างตัวกรองทั้งหมด</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Currency View Mode Switcher -->
+        <div class="currency-mode-box">
+            <div class="currency-mode-title">มุมมองการแสดงตัวเงิน:</div>
+            <div class="radio-group">
+                <label class="radio-label">
+                    <input type="radio" name="currencyMode" value="COCODE" checked onchange="updateCurrencyView()">
+                    🇹🇭 สกุลเงินตามระบบ (CoCode Crcy)
+                </label>
+                <label class="radio-label">
+                    <input type="radio" name="currencyMode" value="TRAN" onchange="updateCurrencyView()">
+                    📄 สกุลเงินตามเอกสาร (Tran Cur.)
+                </label>
+                <label class="radio-label">
+                    <input type="radio" name="currencyMode" value="BOTH" onchange="updateCurrencyView()">
+                    🌐 แสดงทั้งสองสกุลเงิน
+                </label>
+            </div>
+        </div>
+
+        <!-- Step 3: Setup Tax Code Rates -->
+        <div>
+            <button type="button" class="toggle-btn" onclick="toggleSetupBox()">
+                <span id="toggleIcon">⚙️</span> Step 3: ตั้งค่า Tax Code Rates (คลิกเพื่อ ซ่อน/แสดง)
+            </button>
+
+            <div id="setupTaxBox" class="setup-box" style="display: none;">
+                <div class="tax-setup-grid">
+                    <!-- Deferred Tax Section -->
+                    <div>
+                        <div class="setup-section-title">Deferred Tax Rate Setup (%) [สถานะ: โอน TAX]</div>
+                        <div class="tax-rate-grid">
+                            <div class="form-group">
+                                <label for="tax_DL">DL Rate (%)</label>
+                                <input type="number" id="tax_DL" value="0" step="0.01">
+                            </div>
+                            <div class="form-group">
+                                <label for="tax_DM">DM Rate (%)</label>
+                                <input type="number" id="tax_DM" value="7" step="0.01">
+                            </div>
+                            <div class="form-group">
+                                <label for="tax_DN">DN Rate (%)</label>
+                                <input type="number" id="tax_DN" value="10" step="0.01">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tax Section -->
+                    <div>
+                        <div class="setup-section-title">Tax Rate Setup (%) [สถานะ: มี TAX]</div>
+                        <div class="tax-rate-grid">
+                            <div class="form-group">
+                                <label for="tax_O0">O0 Rate (%)</label>
+                                <input type="number" id="tax_O0" value="0" step="0.01">
+                            </div>
+                            <div class="form-group">
+                                <label for="tax_O1">O1 Rate (%)</label>
+                                <input type="number" id="tax_O1" value="7" step="0.01">
+                            </div>
+                            <div class="form-group">
+                                <label for="tax_O2">O2 Rate (%)</label>
+                                <input type="number" id="tax_O2" value="10" step="0.01">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="action-bar">
+            <button class="btn-primary" onclick="processExcel()">
+                ► ประมวลผล Invoice Detail
+            </button>
+            <button class="btn-success" id="btnExport" onclick="exportToExcel()" disabled>
+                ดาวน์โหลดไฟล์ Excel (3 Tabs)
+            </button>
+        </div>
+    </div>
+
+    <div class="summary-cards" id="summaryCards" style="display: none;">
+        <div class="summary-card">
+            <div class="title" id="sumCountLabel">Total Items (SD Doc)</div>
+            <div class="value" id="sumCount">0</div>
+            <div class="sub-value" id="sumCountBreakdown"></div>
+        </div>
+
+        <!-- CoCode Summary Cards -->
+        <div class="summary-card col-cocode">
+            <div class="title">Total Amount (CoCode)</div>
+            <div class="value" id="sumAmountCoCode">0.00</div>
+        </div>
+        <div class="summary-card col-cocode">
+            <div class="title">Total Base (CoCode)</div>
+            <div class="value" id="sumBaseCoCode">0.00</div>
+        </div>
+        <div class="summary-card col-cocode">
+            <div class="title">Total Calc Tax (CoCode)</div>
+            <div class="value" id="sumTaxCoCode">0.00</div>
+        </div>
+        <div class="summary-card col-cocode">
+            <div class="title">Total WHT Base (CoCode)</div>
+            <div class="value" id="sumWhtBaseCoCode">0.00</div>
+        </div>
+        <div class="summary-card col-cocode">
+            <div class="title">Total WHT Amt (CoCode)</div>
+            <div class="value" id="sumWhtAmtCoCode">0.00</div>
+        </div>
+        <div class="summary-card col-cocode transfer-card">
+            <div class="title">💸 Total Transfer Amt (CoCode)</div>
+            <div class="value" id="sumTransferCoCode">0.00</div>
+        </div>
+
+        <!-- Tran Summary Cards -->
+        <div class="summary-card col-tran">
+            <div class="title">Total Amount (Tran)</div>
+            <div class="value" id="sumAmountTran">0.00</div>
+        </div>
+        <div class="summary-card col-tran">
+            <div class="title">Total Base (Tran)</div>
+            <div class="value" id="sumBaseTran">0.00</div>
+        </div>
+        <div class="summary-card col-tran">
+            <div class="title">Total Calc Tax (Tran)</div>
+            <div class="value" id="sumTaxTran">0.00</div>
+        </div>
+        <div class="summary-card col-tran">
+            <div class="title">Total WHT Base (Tran)</div>
+            <div class="value" id="sumWhtBaseTran">0.00</div>
+        </div>
+        <div class="summary-card col-tran">
+            <div class="title">Total WHT Amt (Tran)</div>
+            <div class="value" id="sumWhtAmtTran">0.00</div>
+        </div>
+        <div class="summary-card col-tran transfer-card">
+            <div class="title">💸 Total Transfer Amt (Tran)</div>
+            <div class="value" id="sumTransferTran">0.00</div>
+        </div>
+    </div>
+
+    <div id="filterReport" class="filter-report" style="display: none;"></div>
+
+    <div class="screen-selector">
+        <button id="btnScreen1" class="tab-btn active" onclick="switchScreen('DETAIL')">📋 รายละเอียด Invoice Detail <span id="tabScopeLabel">(SD)</span></button>
+        <button id="btnScreen2" class="tab-btn" onclick="switchScreen('PIVOT')">📊 สรุป PIVOT ตาม Customer</button>
+    </div>
+
+    <div class="table-card">
+        <div id="screenDetail">
+            <div id="tableContainerDetail" class="table-container">
+                <div class="empty-state">กรุณาเลือกไฟล์ Excel แล้วกดปุ่ม "ประมวลผล Invoice Detail"</div>
+            </div>
+        </div>
+
+        <div id="screenPivot" style="display: none;">
+            <div id="tableContainerPivot" class="table-container">
+                <div class="empty-state">กรุณาประมวลผลข้อมูลก่อนสลับหน้าจอมาดู PIVOT</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SAP Multiple Selection Modal -->
+<div id="multiSelectModal" class="modal-overlay" onclick="if (event.target === this) closeMultiSelect()">
+    <div class="modal-card wide">
+        <div class="modal-header">
+            <span id="modalTitle">Multiple Selection (SAP Style)</span>
+            <button class="modal-close-btn" onclick="closeMultiSelect()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <span style="font-size: 12px; color: #64748b;">Select Single Values (IN) — วาง 1 ค่าต่อ 1 บรรทัด (Copy คอลัมน์จาก Excel มาวางได้ไม่จำกัดจำนวน) · ปล่อยว่าง = ทั้งหมด</span>
+            <div class="modal-toolbar">
+                <button type="button" onclick="pasteFromClipboard()" title="Upload from Clipboard (Shift+F12 ใน SAP)">📥 วางจาก Clipboard</button>
+                <button type="button" onclick="dedupeTextarea()">🧹 ลบค่าซ้ำ/บรรทัดว่าง</button>
+                <button type="button" onclick="clearTextarea()">🗑 ล้างทั้งหมด</button>
+            </div>
+            <textarea id="multiSelectTextarea" placeholder="วางข้อมูลที่นี่...&#10;100001&#10;100002&#10;100003" oninput="updateModalCount()"></textarea>
+            <div class="modal-count" id="modalCount">0 รายการ</div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" style="background-color: #e2e8f0; color: #334155; padding: 8px 16px;" onclick="closeMultiSelect()">ยกเลิก</button>
+            <button type="button" style="background-color: var(--primary-color); color: white; padding: 8px 20px;" onclick="applyMultiSelect()">ตกลง (Apply) <span style="font-size:11px; opacity:.8;">Ctrl+Enter</span></button>
+        </div>
+    </div>
+</div>
+
+<script>
+
+    let processedExportData = [];
+    let originalRawData = [];
+    let currentActiveFieldId = null;
+    let lastProcessedScope = 'SD_ONLY';
+    let fileCache = null;          // แคชผลการอ่านไฟล์ ไม่ต้อง parse ซ้ำเมื่อเปลี่ยนแค่ตัวกรอง
+    let missingReport = {};        // ค่าที่ระบุในตัวกรองแต่ไม่พบในผลลัพธ์
+
+    // ===== ชื่อคอลัมน์ที่รองรับ (เรียงตามลำดับความสำคัญ) =====
+    const COLS = {
+        company:      ["Company Code", "CompanyCode", "CoCode"],
+        customer:     ["Customer", "Customer Code", "Cust"],
+        customerName: ["Customer Name", "CustomerName", "Name"],
+        reference:    ["Reference", "Ref"],
+        invRef:       ["Invoice Reference", "Invoice Ref"],
+        payRef:       ["Payment Reference", "Payment Ref"],
+        refDoc:       ["Reference Document", "Reference Doc", "Ref Doc"],
+        refKey3:      ["Reference Key 3", "Reference Key3", "Ref Key 3", "Ref Key3"],
+        sdDoc:        ["SD Document No.", "SD Document", "SD Doc"],
+        je:           ["Journal Entry", "Document No", "Doc No", "Document Number"],
+        jeType:       ["Journal Entry Type", "Doc Type", "Document Type", "Type"],
+        baseline:     ["Baseline Date", "BaselineDate"],
+        payTerms:     ["Payment Terms", "PayT"],
+        netDue:       ["Net Due Date", "NetDueDate", "Due Date"],
+        jeDate:       ["Journal Entry Date", "Document Date", "Doc Date"],
+        coCrcy:       ["Company Code Currency", "CoCode Crcy", "Currency"],
+        amtCo:        ["Amount (CoCode Crcy)", "Amount in Company Code Currency", "Amount CoCode"],
+        tranCrcy:     ["Transaction Currency", "Tran Cur.", "Currency"],
+        amtTran:      ["Amount (Tran Cur.)", "Amount in Transaction Currency", "Amount Tran"],
+        whtBase:      ["Withholding Tax Base", "WHT Base"],
+        whtAmt:       ["Withholding Tax", "WHT Amount", "WHT"],
+        taxCode:      ["Tax Code", "TaxCode"],
+        gl:           ["G/L Account", "GL Account", "Account"],
+        itemText:     ["Item Text", "Text"],
+        origRef:      ["Original Reference Document", "Original Ref Doc"]
+    };
+
+    // ===== ช่องกรองแบบ SAP Select-Options (IN) =====
+    const FILTER_FIELDS = [
+        { id: 'company',  label: 'Company Code',       placeholder: 'เช่น 1000' },
+        { id: 'customer', label: 'Customer Code',      placeholder: 'เช่น 10001' },
+        { id: 'invRef',   label: 'Invoice Reference',  placeholder: 'ทั้งหมด' },
+        { id: 'payRef',   label: 'Payment Reference',  placeholder: 'ทั้งหมด' },
+        { id: 'refDoc',   label: 'Reference Document', placeholder: 'ทั้งหมด' },
+        { id: 'refKey3',  label: 'Reference Key 3',    placeholder: 'ทั้งหมด' },
+        { id: 'je',       label: 'Journal Entry',      placeholder: 'ทั้งหมด' },
+        { id: 'sdDoc',    label: 'SD Document No.',    placeholder: 'ทั้งหมด' }
+    ];
+    const filterValues = {};
+    FILTER_FIELDS.forEach(f => filterValues[f.id] = []);
+
+    const SCOPE_INFO = {
+        SD_ONLY: { title: "(SD Only)",   hint: "* กรองเฉพาะรายการที่มี SD Document No. เท่านั้น",   tab: "(SD)",     count: "Total Items (SD Doc)", file: "SD" },
+        ALL:     { title: "(All Items)", hint: "* แสดงทุกรายการ ทั้งที่มีและไม่มี SD Document No.",    tab: "(ทั้งหมด)",  count: "Total Items (All)",    file: "ALL" },
+        NON_SD:  { title: "(Non-SD)",    hint: "* กรองเฉพาะรายการที่ไม่มี SD Document No. เท่านั้น", tab: "(Non-SD)", count: "Total Items (Non-SD)", file: "NonSD" }
+    };
+
+    // ===== Helpers =====
+    function escapeHtml(val) {
+        return String(val ?? '')
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    // แยกค่าจากข้อความที่วาง: ขึ้นบรรทัด / Tab / comma / semicolon
+    function splitValues(text) {
+        return String(text || '').split(/[\r\n\t,;]+/).map(s => s.trim()).filter(s => s);
+    }
+
+    function uniqueValues(arr) {
+        const seen = new Set();
+        const out = [];
+        arr.forEach(v => {
+            const k = normKey(v);
+            if (!seen.has(k)) { seen.add(k); out.push(v); }
+        });
+        return out;
+    }
+
+    // Normalize สำหรับเปรียบเทียบ: ตัดช่องว่าง, ตัวพิมพ์ใหญ่, ตัด 0 นำหน้าถ้าเป็นตัวเลขล้วน (แบบ SAP ALPHA)
+    function normKey(v) {
+        let s = String(v ?? '').trim().toUpperCase();
+        if (/^\d+$/.test(s)) s = s.replace(/^0+(?=\d)/, '');
+        return s;
+    }
+
+    function normHeader(h) {
+        return String(h).toLowerCase().replace(/[\s._\-()/]+/g, ' ').trim();
+    }
+
+    // จับคู่ชื่อคอลัมน์ในไฟล์กับ COLS (ไม่สนตัวพิมพ์/ช่องว่าง/จุด)
+    function resolveColumns(headers) {
+        const byNorm = {};
+        headers.forEach(h => { const n = normHeader(h); if (!(n in byNorm)) byNorm[n] = h; });
+        const map = {};
+        for (const key in COLS) {
+            map[key] = COLS[key].map(c => byNorm[normHeader(c)]).filter(h => h !== undefined);
+        }
+        return map;
+    }
+
+    function getRaw(row, colMap, key) {
+        for (const h of colMap[key]) {
+            const v = row[h];
+            if (v !== undefined && v !== null && String(v).trim() !== "") return v;
+        }
+        return "";
+    }
+
+    function getStr(row, colMap, key) {
+        const v = getRaw(row, colMap, key);
+        return v === "" ? "" : String(v).trim();
+    }
+
+    // แปลงตัวเลขรองรับรูปแบบ SAP: "1,234.56", "1,234.56-", "(1,234.56)"
+    function parseAmount(v) {
+        if (v === null || v === undefined || v === '') return 0;
+        if (typeof v === 'number') return isFinite(v) ? v : 0;
+        let s = String(v).trim().replace(/,/g, '').replace(/\s/g, '');
+        let neg = false;
+        if (/-$/.test(s)) { neg = true; s = s.slice(0, -1); }
+        if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1, -1); }
+        const n = parseFloat(s);
+        if (isNaN(n)) return 0;
+        return neg ? -Math.abs(n) : n;
+    }
+
+    function getSelectedScope() {
+        const el = document.querySelector('input[name="sdScope"]:checked');
+        return el ? el.value : 'SD_ONLY';
+    }
+
+    // ===== SAP-style Filter Fields =====
+    function buildFilterFields() {
+        const grid = document.getElementById('filterGrid');
+        grid.innerHTML = FILTER_FIELDS.map(f => `
+            <div class="form-group">
+                <label for="f_${f.id}">${escapeHtml(f.label)}</label>
+                <div class="input-with-btn">
+                    <div class="sel-field">
+                        <input type="text" id="f_${f.id}" placeholder="${escapeHtml(f.placeholder)}" autocomplete="off">
+                    </div>
+                    <button type="button" class="sap-multi-btn" id="m_${f.id}" title="Multiple Selection (IN)">📋</button>
+                    <button type="button" class="sap-clear-btn" id="c_${f.id}" title="ล้างค่า">✕</button>
+                </div>
+                ${f.id === 'sdDoc' ? '<span class="hint-text" id="sdDocFilterHint"></span>' : ''}
+            </div>
+        `).join('');
+
+        FILTER_FIELDS.forEach(f => {
+            const input = document.getElementById(`f_${f.id}`);
+
+            // วางหลายบรรทัดจาก Excel ลงช่องโดยตรง → แปลงเป็น list ทันที
+            input.addEventListener('paste', (e) => {
+                const text = (e.clipboardData || window.clipboardData).getData('text');
+                const vals = splitValues(text);
+                if (vals.length > 1 || /[\r\n\t]/.test(text.trim())) {
+                    e.preventDefault();
+                    const merged = filterValues[f.id].length > 1 ? filterValues[f.id].concat(vals) : vals;
+                    filterValues[f.id] = uniqueValues(merged);
+                    renderFilterField(f.id);
+                }
+            });
+
+            // พิมพ์เอง (ค่าเดียว หรือคั่นด้วย comma)
+            input.addEventListener('change', () => {
+                if (input.readOnly) return;
+                filterValues[f.id] = uniqueValues(splitValues(input.value));
+                renderFilterField(f.id);
+            });
+
+            // ถ้ามีหลายค่า คลิกที่ช่องเพื่อเปิด Multiple Selection
+            input.addEventListener('click', () => {
+                if (input.readOnly && !input.disabled) openMultiSelect(f.id);
+            });
+
+            document.getElementById(`m_${f.id}`).addEventListener('click', () => openMultiSelect(f.id));
+            document.getElementById(`c_${f.id}`).addEventListener('click', () => {
+                filterValues[f.id] = [];
+                renderFilterField(f.id);
+            });
+
+            renderFilterField(f.id);
+        });
+    }
+
+    function renderFilterField(id) {
+        const list = filterValues[id];
+        const input = document.getElementById(`f_${id}`);
+        const btn = document.getElementById(`m_${id}`);
+        const clr = document.getElementById(`c_${id}`);
+
+        if (list.length > 1) {
+            input.readOnly = true;
+            input.classList.add('multi');
+            input.value = `${list[0]}  … (+${(list.length - 1).toLocaleString('en-US')} รายการ)`;
+            input.title = 'คลิกเพื่อดู/แก้ไขรายการทั้งหมด';
+            btn.classList.add('active');
+            btn.innerHTML = `📋<span class="multi-badge">${list.length.toLocaleString('en-US')}</span>`;
+        } else {
+            input.readOnly = false;
+            input.classList.remove('multi');
+            input.value = list[0] || '';
+            input.title = '';
+            btn.classList.remove('active');
+            btn.innerHTML = '📋';
+        }
+        clr.style.visibility = list.length ? 'visible' : 'hidden';
+    }
+
+    // ดึงค่าล่าสุด (กรณีผู้ใช้พิมพ์แล้วยังไม่ blur ก่อนกดประมวลผล)
+    function syncTypedFilters() {
+        FILTER_FIELDS.forEach(f => {
+            const input = document.getElementById(`f_${f.id}`);
+            if (!input.readOnly) filterValues[f.id] = uniqueValues(splitValues(input.value));
+        });
+    }
+
+    function clearAllFilters() {
+        FILTER_FIELDS.forEach(f => { filterValues[f.id] = []; renderFilterField(f.id); });
+        document.getElementById('filterDateFrom').value = '';
+        document.getElementById('filterDateTo').value = '';
+    }
+
+    function updateSdScopeUI() {
+        const scope = getSelectedScope();
+        const info = SCOPE_INFO[scope];
+
+        document.getElementById('scopeHint').innerText = info.hint;
+        document.getElementById('appTitleScope').innerText = info.title;
+        document.getElementById('tabScopeLabel').innerText = info.tab;
+
+        const isNonSd = scope === 'NON_SD';
+        document.getElementById('f_sdDoc').disabled = isNonSd;
+        document.getElementById('m_sdDoc').disabled = isNonSd;
+        document.getElementById('c_sdDoc').disabled = isNonSd;
+
+        let sdHint = '';
+        if (isNonSd) sdHint = '* ไม่ใช้งานในโหมด "เฉพาะรายการที่ไม่มี SD Document No."';
+        else if (scope === 'ALL') sdHint = '* ถ้าระบุ SD Document No. จะแสดงเฉพาะรายการที่ตรงกัน (รายการที่ไม่มี SD จะไม่แสดง)';
+        document.getElementById('sdDocFilterHint').innerText = sdHint;
+
+        if (processedExportData.length > 0 && scope !== lastProcessedScope) {
+            document.getElementById('scopeHint').innerText = info.hint + ' (กด "ประมวลผล" ใหม่เพื่อใช้ขอบเขตนี้)';
+        }
+    }
+
+    // ===== Multiple Selection Modal =====
+    function openMultiSelect(fieldId) {
+        syncTypedFilters();
+        currentActiveFieldId = fieldId;
+        const field = FILTER_FIELDS.find(f => f.id === fieldId);
+        document.getElementById('modalTitle').innerText = `Multiple Selection: ${field.label}`;
+        const ta = document.getElementById('multiSelectTextarea');
+        ta.value = filterValues[fieldId].join('\n');
+        updateModalCount();
+        document.getElementById('multiSelectModal').style.display = 'flex';
+        ta.focus();
+    }
+
+    function closeMultiSelect() {
+        document.getElementById('multiSelectModal').style.display = 'none';
+        currentActiveFieldId = null;
+    }
+
+    function applyMultiSelect() {
+        if (!currentActiveFieldId) return;
+        const vals = splitValues(document.getElementById('multiSelectTextarea').value);
+        filterValues[currentActiveFieldId] = uniqueValues(vals);
+        renderFilterField(currentActiveFieldId);
+        closeMultiSelect();
+    }
+
+    function updateModalCount() {
+        const vals = splitValues(document.getElementById('multiSelectTextarea').value);
+        const uniq = uniqueValues(vals).length;
+        const dup = vals.length - uniq;
+        document.getElementById('modalCount').innerHTML =
+            `${uniq.toLocaleString('en-US')} รายการ` +
+            (dup > 0 ? ` <span class="dup">(ค่าซ้ำ ${dup.toLocaleString('en-US')} รายการ จะถูกตัดออกอัตโนมัติ)</span>` : '') +
+            (uniq === 0 ? ' — ว่าง = ทั้งหมด' : '');
+    }
+
+    async function pasteFromClipboard() {
+        const ta = document.getElementById('multiSelectTextarea');
+        try {
+            const text = await navigator.clipboard.readText();
+            const current = ta.value.trim();
+            ta.value = (current ? current + '\n' : '') + splitValues(text).join('\n');
+            updateModalCount();
+        } catch (err) {
+            alert('เบราว์เซอร์ไม่อนุญาตให้อ่าน Clipboard — กรุณากด Ctrl+V ในช่องแทน');
+            ta.focus();
+        }
+    }
+
+    function dedupeTextarea() {
+        const ta = document.getElementById('multiSelectTextarea');
+        ta.value = uniqueValues(splitValues(ta.value)).join('\n');
+        updateModalCount();
+    }
+
+    function clearTextarea() {
+        document.getElementById('multiSelectTextarea').value = '';
+        updateModalCount();
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (document.getElementById('multiSelectModal').style.display !== 'flex') return;
+        if (e.key === 'Escape') closeMultiSelect();
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); applyMultiSelect(); }
+    });
+
+    function toggleSetupBox() {
+        const box = document.getElementById('setupTaxBox');
+        box.style.display = (box.style.display === 'none' || box.style.display === '') ? 'block' : 'none';
+    }
+
+    function switchScreen(screenType) {
+        const isDetail = screenType === 'DETAIL';
+        document.getElementById('screenDetail').style.display = isDetail ? 'block' : 'none';
+        document.getElementById('screenPivot').style.display = isDetail ? 'none' : 'block';
+        document.getElementById('btnScreen1').classList.toggle('active', isDetail);
+        document.getElementById('btnScreen2').classList.toggle('active', !isDetail);
+    }
+
+    const numberFormatter = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    function formatNumber(num) {
+        if (num === null || num === undefined || num === '') return '0.00';
+        const parsed = parseFloat(num);
+        if (isNaN(parsed)) return '0.00';
+        return numberFormatter.format(parsed);
+    }
+
+    function getDocTypeName(jeType) {
+        if (!jeType) return "";
+        const code = String(jeType).trim().toUpperCase();
+        if (code === "RV") return "Invoice";
+        if (code === "DG") return "Credit Note";
+        if (code === "DR") return "Debit Note";
+        return code;
+    }
+
+    function parseDateObj(v) {
+        if (v === null || v === undefined || v === '') return null;
+        if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+        if (typeof v === 'number') {
+            const dc = XLSX.SSF.parse_date_code(v);
+            return dc ? new Date(dc.y, dc.m - 1, dc.d) : null;
+        }
+        const s = String(v).trim();
+        const partsDot = s.split('.');
+        if (partsDot.length === 3 && partsDot.every(p => /^\d+$/.test(p))) {
+            return new Date(+partsDot[2], +partsDot[1] - 1, +partsDot[0]); // DD.MM.YYYY
+        }
+        const partsSlash = s.split('/');
+        if (partsSlash.length === 3 && partsSlash.every(p => /^\d+$/.test(p))) {
+            return new Date(+partsSlash[2], +partsSlash[0] - 1, +partsSlash[1]); // MM/DD/YYYY
+        }
+        const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (iso) return new Date(+iso[1], +iso[2] - 1, +iso[3]);
+        const parsed = new Date(s);
+        return isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    function formatDateStr(dateObj) {
+        if (!dateObj || isNaN(dateObj.getTime())) return '';
+        const y = dateObj.getFullYear();
+        const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const d = String(dateObj.getDate()).padStart(2, '0');
+        return `${d}.${m}.${y}`;
+    }
+
+    function buildOriginalRows(ws) {
+        if (!ws || !ws['!ref']) return [];
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        const isDateFmt = (XLSX.SSF && typeof XLSX.SSF.is_date === 'function') ? XLSX.SSF.is_date : () => false;
+        const rows = [];
+        for (let r = range.s.r; r <= range.e.r; r++) {
+            const row = [];
+            for (let c = range.s.c; c <= range.e.c; c++) {
+                const cell = ws[XLSX.utils.encode_cell({ r, c })];
+                if (!cell || cell.v === undefined) { row.push(null); continue; }
+                if (cell.t === 'n' && cell.z && isDateFmt(cell.z)) {
+                    const dc = XLSX.SSF.parse_date_code(cell.v);
+                    row.push(dc ? new Date(Date.UTC(dc.y, dc.m - 1, dc.d, dc.H, dc.M, Math.floor(dc.S))) : cell.v);
+                } else {
+                    row.push(cell.v);
+                }
+            }
+            rows.push(row);
+        }
+        return rows;
+    }
+
+    // ===== Tax / WHT =====
+    function getTaxRateTables() {
+        const val = id => parseFloat(document.getElementById(id).value) || 0;
+        return {
+            deferred: { "DL": val('tax_DL'), "DM": val('tax_DM'), "DN": val('tax_DN') },
+            normal:   { "O0": val('tax_O0'), "O1": val('tax_O1'), "O2": val('tax_O2') }
+        };
+    }
+
+    function calculateTaxSplit(totalAmount, taxCode, rates) {
+        if (!taxCode) return { taxRate: 0, baseAmount: totalAmount, taxAmount: 0, status: "" };
+        const code = String(taxCode).trim().toUpperCase();
+        let rate, status;
+        if (code in rates.deferred) { rate = rates.deferred[code]; status = "โอน TAX"; }
+        else if (code in rates.normal) { rate = rates.normal[code]; status = "มี TAX"; }
+        else return { taxRate: 0, baseAmount: totalAmount, taxAmount: 0, status: "" };
+
+        if (rate === 0) return { taxRate: 0, baseAmount: totalAmount, taxAmount: 0, status };
+        const baseAmount = totalAmount * (100 / (100 + rate));
+        return { taxRate: rate, baseAmount, taxAmount: totalAmount - baseAmount, status };
+    }
+
+    function analyzeWHT(whtBase, whtAmt) {
+        const base = Math.abs(whtBase || 0);
+        const amt = Math.abs(whtAmt || 0);
+        if (base > 0 && amt === 0) return { status: "หาไม่เจอ", rateStr: "0%" };
+        if (base > 0 && amt > 0) return { status: "หาเจอ", rateStr: `${((amt / base) * 100).toFixed(2)}%` };
+        return { status: "ไม่มี WHT", rateStr: "-" };
+    }
+
+    // ===== File reading (with cache) =====
+    document.getElementById('excelFile').addEventListener('change', () => { fileCache = null; });
+
+    function readWorkbook(file) {
+        return new Promise((resolve, reject) => {
+            if (fileCache && fileCache.name === file.name && fileCache.size === file.size && fileCache.lastModified === file.lastModified) {
+                return resolve(fileCache);
+            }
+            const reader = new FileReader();
+            reader.onerror = () => reject(new Error('อ่านไฟล์ไม่สำเร็จ'));
+            reader.onload = (e) => {
+                try {
+                    const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellNF: true });
+                    const ws = wb.Sheets[wb.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(ws, { defval: "" });
+                    const headers = jsonData.length ? Object.keys(jsonData[0]) : [];
+                    fileCache = {
+                        name: file.name, size: file.size, lastModified: file.lastModified,
+                        jsonData, colMap: resolveColumns(headers), originalRows: buildOriginalRows(ws)
+                    };
+                    resolve(fileCache);
+                } catch (err) { reject(err); }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    async function processExcel() {
+        const fileInput = document.getElementById('excelFile');
+        if (!fileInput.files.length) {
+            alert('กรุณาเลือกไฟล์ Excel ก่อนครับ');
+            return;
+        }
+
+        let data;
+        try {
+            data = await readWorkbook(fileInput.files[0]);
+        } catch (err) {
+            alert('ไม่สามารถอ่านไฟล์ Excel ได้: ' + err.message);
+            return;
+        }
+
+        const { jsonData, colMap } = data;
+        originalRawData = data.originalRows;
+
+        if (jsonData.length === 0) {
+            alert('ไม่พบข้อมูลในไฟล์ Excel');
+            return;
+        }
+
+        syncTypedFilters();
+        const scope = getSelectedScope();
+        lastProcessedScope = scope;
+
+        // เตรียมเงื่อนไข IN เป็น Set (เร็วแม้มีหลายหมื่นค่า)
+        const activeFilters = FILTER_FIELDS
+            .filter(f => filterValues[f.id].length > 0 && !(f.id === 'sdDoc' && scope === 'NON_SD'))
+            .map(f => ({ ...f, set: new Set(filterValues[f.id].map(normKey)) }));
+
+        // แจ้งเตือนถ้าใส่ตัวกรองของคอลัมน์ที่ไม่มีในไฟล์
+        const missingCols = activeFilters.filter(f => colMap[f.id].length === 0).map(f => f.label);
+        if (missingCols.length) {
+            alert('ไม่พบคอลัมน์ต่อไปนี้ในไฟล์ Excel จึงกรองไม่ได้:\n- ' + missingCols.join('\n- ') +
+                  '\n\nกรุณาตรวจสอบชื่อหัวคอลัมน์ หรือล้างตัวกรองช่องนั้น');
+            return;
+        }
+
+        const dateFromStr = document.getElementById('filterDateFrom').value;
+        const dateToStr = document.getElementById('filterDateTo').value;
+        const dateFrom = dateFromStr ? parseDateObj(dateFromStr) : null;
+        const dateTo = dateToStr ? parseDateObj(dateToStr) : null;
+        if (dateTo) dateTo.setHours(23, 59, 59, 999);
+
+        const filteredData = jsonData.filter(row => {
+            const hasSd = getStr(row, colMap, 'sdDoc') !== "";
+            if (scope === 'SD_ONLY' && !hasSd) return false;
+            if (scope === 'NON_SD' && hasSd) return false;
+
+            for (const f of activeFilters) {
+                if (!f.set.has(normKey(getRaw(row, colMap, f.id)))) return false;
+            }
+
+            if (dateFrom || dateTo) {
+                const d = parseDateObj(getRaw(row, colMap, 'jeDate'));
+                if (!d) return false;
+                if (dateFrom && d < dateFrom) return false;
+                if (dateTo && d > dateTo) return false;
+            }
+            return true;
+        });
+
+        buildMissingReport(activeFilters, filteredData, colMap);
+        updateSdScopeUI();
+        document.getElementById('sumCountLabel').innerText = SCOPE_INFO[scope].count;
+
+        if (filteredData.length === 0) {
+            alert('ไม่พบข้อมูลที่ตรงตามเงื่อนไขที่กำหนด');
+            renderDetailTable([], colMap);
+            renderPivotScreen([]);
+            updateCurrencyView();
+            document.getElementById('btnExport').disabled = true;
+            return;
+        }
+
+        renderDetailTable(filteredData, colMap);
+        renderPivotScreen(processedExportData);
+        updateCurrencyView();
+        document.getElementById('btnExport').disabled = false;
+    }
+
+    // รายงานค่าที่ระบุในตัวกรองแต่ไม่พบในผลลัพธ์ (ช่วยกระทบยอดเหมือนเช็คกับ SAP)
+    function buildMissingReport(activeFilters, rows, colMap) {
+        missingReport = {};
+        const box = document.getElementById('filterReport');
+        const parts = [];
+
+        activeFilters.forEach(f => {
+            const found = new Set(rows.map(r => normKey(getRaw(r, colMap, f.id))));
+            const missing = filterValues[f.id].filter(v => !found.has(normKey(v)));
+            if (missing.length === 0) return;
+            missingReport[f.id] = missing;
+            const shown = missing.slice(0, 30).map(escapeHtml).join(', ');
+            const more = missing.length > 30 ? ` … (+${missing.length - 30})` : '';
+            parts.push(`
+                <div class="filter-report-row">
+                    <strong>${escapeHtml(f.label)}:</strong>
+                    <span>ไม่พบ ${missing.length.toLocaleString('en-US')} จาก ${filterValues[f.id].length.toLocaleString('en-US')} ค่า</span>
+                    <span class="filter-report-values">${shown}${more}</span>
+                    <button type="button" onclick="copyMissing('${f.id}')">คัดลอกทั้งหมด</button>
+                </div>`);
+        });
+
+        if (parts.length === 0) {
+            box.style.display = 'none';
+            box.innerHTML = '';
+            return;
+        }
+        box.innerHTML = `<div class="filter-report-title">⚠️ ค่าที่ระบุในตัวกรองแต่ไม่พบในผลลัพธ์</div>${parts.join('')}`;
+        box.style.display = 'block';
+    }
+
+    async function copyMissing(id) {
+        const text = (missingReport[id] || []).join('\n');
+        try {
+            await navigator.clipboard.writeText(text);
+            alert(`คัดลอก ${missingReport[id].length} ค่าแล้ว (1 ค่าต่อบรรทัด)`);
+        } catch (err) {
+            prompt('คัดลอกข้อความด้านล่าง:', text.replace(/\n/g, ', '));
+        }
+    }
+
+    // ===== Render Detail =====
+    function renderDetailTable(data, colMap) {
+        const totals = {
+            amountCoCode: 0, baseCoCode: 0, taxCoCode: 0, whtBaseCoCode: 0, whtAmtCoCode: 0, transferCoCode: 0,
+            amountTran: 0, baseTran: 0, taxTran: 0, whtBaseTran: 0, whtAmtTran: 0, transferTran: 0,
+            count: 0, countSd: 0, countNonSd: 0
+        };
+        processedExportData = [];
+        const rates = getTaxRateTables();
+        const rowsHtml = [];
+
+        let tableHtml = `
+            <table id="detailTable">
+                <thead>
+                    <tr>
+                        <th>Company Code</th>
+                        <th>Customer</th>
+                        <th>Customer Name</th>
+                        <th>Reference</th>
+                        <th>Invoice Reference</th>
+                        <th>Payment Reference</th>
+                        <th>Reference Document</th>
+                        <th>Reference Key 3</th>
+                        <th>SD Document No.</th>
+                        <th>Journal Entry</th>
+                        <th>Journal Entry Type</th>
+                        <th style="background-color: #1e40af; color: #ffffff;">Doc Type Name</th>
+                        <th>Baseline Date</th>
+                        <th>Payment Terms</th>
+                        <th>Net Due Date</th>
+                        <th>Journal Entry Date</th>
+
+                        <th class="col-cocode">Currency (CoCode)</th>
+                        <th class="col-cocode">Amount (CoCode)</th>
+                        <th class="col-cocode" style="background-color: #0f766e; color: #fff;">Tax Base (CoCode)</th>
+                        <th class="col-cocode" style="background-color: #0f766e; color: #fff;">Calc Tax (CoCode)</th>
+                        <th class="col-cocode" style="background-color: #1d4ed8; color: #fff;">WHT Base (CoCode)</th>
+                        <th class="col-cocode" style="background-color: #1d4ed8; color: #fff;">WHT Amount (CoCode)</th>
+                        <th class="col-cocode" style="background-color: #b45309; color: #fff;">Transfer Amount (CoCode)</th>
+
+                        <th class="col-tran">Currency (Tran)</th>
+                        <th class="col-tran">Amount (Tran)</th>
+                        <th class="col-tran" style="background-color: #0369a1; color: #fff;">Tax Base (Tran)</th>
+                        <th class="col-tran" style="background-color: #0369a1; color: #fff;">Calc Tax (Tran)</th>
+                        <th class="col-tran" style="background-color: #4338ca; color: #fff;">WHT Base (Tran)</th>
+                        <th class="col-tran" style="background-color: #4338ca; color: #fff;">WHT Amount (Tran)</th>
+                        <th class="col-tran" style="background-color: #b45309; color: #fff;">Transfer Amount (Tran)</th>
+
+                        <th>Tax Code</th>
+                        <th style="background-color: #b45309; color: #fff;">Tax Status</th>
+                        <th style="background-color: #1e40af; color: #fff;">WHT Status</th>
+                        <th style="background-color: #1e40af; color: #fff;">WHT Rate %</th>
+                        <th>G/L Account</th>
+                        <th>Item Text</th>
+                        <th>Original Reference Document</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        data.forEach(row => {
+            const S = key => getStr(row, colMap, key);
+            const R = key => getRaw(row, colMap, key);
+
+            const companyCode = S('company');
+            const customer = S('customer');
+            const customerName = S('customerName');
+            const reference = S('reference');
+            const invRef = S('invRef');
+            const payRef = S('payRef');
+            const refDoc = S('refDoc');
+            const refKey3 = S('refKey3');
+            const sdDocNo = S('sdDoc');
+            const journalEntry = S('je');
+            const jeType = S('jeType');
+            const docTypeName = getDocTypeName(jeType);
+            const baselineDate = formatDateStr(parseDateObj(R('baseline')));
+            const paymentTerms = S('payTerms');
+            const netDueDate = formatDateStr(parseDateObj(R('netDue')));
+            const jeDate = formatDateStr(parseDateObj(R('jeDate')));
+
+            const coCodeCrcy = S('coCrcy');
+            const amountCoCode = parseAmount(R('amtCo'));
+            const tranCrcy = S('tranCrcy');
+            const amountTran = parseAmount(R('amtTran'));
+
+            const whtBaseRaw = parseAmount(R('whtBase'));
+            const whtAmtRaw = parseAmount(R('whtAmt'));
+
+            const exchangeRate = (amountTran !== 0) ? (amountCoCode / amountTran) : 1;
+            const whtBaseTran = whtBaseRaw;
+            const whtAmtTran = whtAmtRaw;
+            const whtBaseCoCode = whtBaseRaw * exchangeRate;
+            const whtAmtCoCode = whtAmtRaw * exchangeRate;
+
+            const taxCode = S('taxCode');
+            const taxCalcCoCode = calculateTaxSplit(amountCoCode, taxCode, rates);
+            const taxCalcTran = calculateTaxSplit(amountTran, taxCode, rates);
+
+            const transferCoCode = taxCalcCoCode.baseAmount + taxCalcCoCode.taxAmount - whtAmtCoCode;
+            const transferTran = taxCalcTran.baseAmount + taxCalcTran.taxAmount - whtAmtTran;
+
+            const whtAnalysis = analyzeWHT(whtBaseRaw, whtAmtRaw);
+
+            const glAccount = S('gl');
+            const itemText = S('itemText');
+            const origRefDoc = S('origRef');
+
+            totals.amountCoCode += amountCoCode;
+            totals.baseCoCode += taxCalcCoCode.baseAmount;
+            totals.taxCoCode += taxCalcCoCode.taxAmount;
+            totals.whtBaseCoCode += whtBaseCoCode;
+            totals.whtAmtCoCode += whtAmtCoCode;
+            totals.transferCoCode += transferCoCode;
+            totals.amountTran += amountTran;
+            totals.baseTran += taxCalcTran.baseAmount;
+            totals.taxTran += taxCalcTran.taxAmount;
+            totals.whtBaseTran += whtBaseTran;
+            totals.whtAmtTran += whtAmtTran;
+            totals.transferTran += transferTran;
+            totals.count++;
+            if (sdDocNo) totals.countSd++; else totals.countNonSd++;
+
+            let statusBadge = "-";
+            if (taxCalcCoCode.status === "มี TAX") statusBadge = `<span class="badge-tax">มี TAX</span>`;
+            else if (taxCalcCoCode.status === "โอน TAX") statusBadge = `<span class="badge-deferred">โอน TAX</span>`;
+
+            let whtStatusBadge = `<span class="badge-wht-none">ไม่มี WHT</span>`;
+            if (whtAnalysis.status === "หาเจอ") whtStatusBadge = `<span class="badge-wht-found">หาเจอ</span>`;
+            else if (whtAnalysis.status === "หาไม่เจอ") whtStatusBadge = `<span class="badge-wht-missing">หาไม่เจอ</span>`;
+
+            const sdDocCell = sdDocNo
+                ? `<span style="font-weight: bold; color: #1e3a8a;">${escapeHtml(sdDocNo)}</span>`
+                : `<span class="badge-no-sd">ไม่มี SD</span>`;
+
+            processedExportData.push({
+                "Company Code": companyCode,
+                "Customer": customer,
+                "Customer Name": customerName,
+                "Reference": reference,
+                "Invoice Reference": invRef,
+                "Payment Reference": payRef,
+                "Reference Document": refDoc,
+                "Reference Key 3": refKey3,
+                "SD Document No.": sdDocNo,
+                "Journal Entry": journalEntry,
+                "Journal Entry Type": jeType,
+                "Doc Type Name": docTypeName,
+                "Baseline Date": baselineDate,
+                "Payment Terms": paymentTerms,
+                "Net Due Date": netDueDate,
+                "Journal Entry Date": jeDate,
+
+                "Company Code Currency": coCodeCrcy,
+                "Amount (CoCode Crcy)": amountCoCode,
+                "Tax Base (CoCode)": taxCalcCoCode.baseAmount,
+                "Calc Tax (CoCode)": taxCalcCoCode.taxAmount,
+                "WHT Base (CoCode)": whtBaseCoCode,
+                "WHT Amount (CoCode)": whtAmtCoCode,
+                "Transfer Amount (CoCode)": transferCoCode,
+
+                "Transaction Currency": tranCrcy,
+                "Amount (Tran Cur.)": amountTran,
+                "Tax Base (Tran)": taxCalcTran.baseAmount,
+                "Calc Tax (Tran)": taxCalcTran.taxAmount,
+                "WHT Base (Tran)": whtBaseTran,
+                "WHT Amount (Tran)": whtAmtTran,
+                "Transfer Amount (Tran)": transferTran,
+
+                "Tax Code": taxCode,
+                "Tax Status": taxCalcCoCode.status || "-",
+                "WHT Status": whtAnalysis.status,
+                "WHT Rate %": whtAnalysis.rateStr,
+                "G/L Account": glAccount,
+                "Item Text": itemText,
+                "Original Reference Document": origRefDoc
+            });
+
+            rowsHtml.push(`
+                <tr>
+                    <td class="text-center">${escapeHtml(companyCode)}</td>
+                    <td class="text-center">${escapeHtml(customer)}</td>
+                    <td class="text-left">${escapeHtml(customerName)}</td>
+                    <td class="text-center">${escapeHtml(reference)}</td>
+                    <td class="text-center">${escapeHtml(invRef)}</td>
+                    <td class="text-center">${escapeHtml(payRef)}</td>
+                    <td class="text-center">${escapeHtml(refDoc)}</td>
+                    <td class="text-center">${escapeHtml(refKey3)}</td>
+                    <td class="text-center">${sdDocCell}</td>
+                    <td class="text-center">${escapeHtml(journalEntry)}</td>
+                    <td class="text-center">${escapeHtml(jeType)}</td>
+                    <td class="text-center" style="font-weight: 600; color: #1e40af;">${escapeHtml(docTypeName)}</td>
+                    <td class="text-center">${baselineDate}</td>
+                    <td class="text-center">${escapeHtml(paymentTerms)}</td>
+                    <td class="text-center">${netDueDate}</td>
+                    <td class="text-center">${jeDate}</td>
+
+                    <td class="text-center col-cocode">${escapeHtml(coCodeCrcy)}</td>
+                    <td class="text-right col-cocode">${formatNumber(amountCoCode)}</td>
+                    <td class="text-right col-cocode" style="color: #0f766e; font-weight: 600;">${formatNumber(taxCalcCoCode.baseAmount)}</td>
+                    <td class="text-right col-cocode" style="color: #0f766e; font-weight: 600;">${formatNumber(taxCalcCoCode.taxAmount)}</td>
+                    <td class="text-right col-cocode" style="color: #1d4ed8;">${formatNumber(whtBaseCoCode)}</td>
+                    <td class="text-right col-cocode" style="color: #1d4ed8;">${formatNumber(whtAmtCoCode)}</td>
+                    <td class="text-right col-cocode" style="color: #b45309; font-weight: bold; background-color: #fffbeb;">${formatNumber(transferCoCode)}</td>
+
+                    <td class="text-center col-tran">${escapeHtml(tranCrcy)}</td>
+                    <td class="text-right col-tran">${formatNumber(amountTran)}</td>
+                    <td class="text-right col-tran" style="color: #0369a1; font-weight: 600;">${formatNumber(taxCalcTran.baseAmount)}</td>
+                    <td class="text-right col-tran" style="color: #0369a1; font-weight: 600;">${formatNumber(taxCalcTran.taxAmount)}</td>
+                    <td class="text-right col-tran" style="color: #4338ca;">${formatNumber(whtBaseTran)}</td>
+                    <td class="text-right col-tran" style="color: #4338ca;">${formatNumber(whtAmtTran)}</td>
+                    <td class="text-right col-tran" style="color: #b45309; font-weight: bold; background-color: #fffbeb;">${formatNumber(transferTran)}</td>
+
+                    <td class="text-center">${escapeHtml(taxCode)}</td>
+                    <td class="text-center">${statusBadge}</td>
+                    <td class="text-center">${whtStatusBadge}</td>
+                    <td class="text-center" style="font-weight: 700; color: #1d4ed8;">${whtAnalysis.rateStr}</td>
+                    <td class="text-center">${escapeHtml(glAccount)}</td>
+                    <td class="text-left">${escapeHtml(itemText)}</td>
+                    <td class="text-center">${escapeHtml(origRefDoc)}</td>
+                </tr>
+            `);
+        });
+
+        tableHtml += rowsHtml.join('');
+        tableHtml += `
+                </tbody>
+                <tfoot>
+                    <tr class="total-row">
+                        <td colspan="16" class="text-center">Total</td>
+
+                        <td class="text-center col-cocode">-</td>
+                        <td class="text-right col-cocode">${formatNumber(totals.amountCoCode)}</td>
+                        <td class="text-right col-cocode">${formatNumber(totals.baseCoCode)}</td>
+                        <td class="text-right col-cocode">${formatNumber(totals.taxCoCode)}</td>
+                        <td class="text-right col-cocode">${formatNumber(totals.whtBaseCoCode)}</td>
+                        <td class="text-right col-cocode">${formatNumber(totals.whtAmtCoCode)}</td>
+                        <td class="text-right col-cocode" style="color: #b45309;">${formatNumber(totals.transferCoCode)}</td>
+
+                        <td class="text-center col-tran">-</td>
+                        <td class="text-right col-tran">${formatNumber(totals.amountTran)}</td>
+                        <td class="text-right col-tran">${formatNumber(totals.baseTran)}</td>
+                        <td class="text-right col-tran">${formatNumber(totals.taxTran)}</td>
+                        <td class="text-right col-tran">${formatNumber(totals.whtBaseTran)}</td>
+                        <td class="text-right col-tran">${formatNumber(totals.whtAmtTran)}</td>
+                        <td class="text-right col-tran" style="color: #b45309;">${formatNumber(totals.transferTran)}</td>
+
+                        <td colspan="7"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        `;
+
+        document.getElementById('tableContainerDetail').innerHTML = tableHtml;
+
+        document.getElementById('sumCount').innerText = totals.count.toLocaleString('en-US');
+        document.getElementById('sumCountBreakdown').innerText =
+            lastProcessedScope === 'ALL' ? `มี SD: ${totals.countSd} | ไม่มี SD: ${totals.countNonSd}` : '';
+
+        const setSum = (id, v) => document.getElementById(id).innerText = formatNumber(v);
+        setSum('sumAmountCoCode', totals.amountCoCode);
+        setSum('sumBaseCoCode', totals.baseCoCode);
+        setSum('sumTaxCoCode', totals.taxCoCode);
+        setSum('sumWhtBaseCoCode', totals.whtBaseCoCode);
+        setSum('sumWhtAmtCoCode', totals.whtAmtCoCode);
+        setSum('sumTransferCoCode', totals.transferCoCode);
+        setSum('sumAmountTran', totals.amountTran);
+        setSum('sumBaseTran', totals.baseTran);
+        setSum('sumTaxTran', totals.taxTran);
+        setSum('sumWhtBaseTran', totals.whtBaseTran);
+        setSum('sumWhtAmtTran', totals.whtAmtTran);
+        setSum('sumTransferTran', totals.transferTran);
+
+        document.getElementById('summaryCards').style.display = 'grid';
+    }
+
+    function updateCurrencyView() {
+        const selectedMode = document.querySelector('input[name="currencyMode"]:checked').value;
+        const showCoCode = selectedMode !== 'TRAN';
+        const showTran = selectedMode !== 'COCODE';
+        document.querySelectorAll('.col-cocode').forEach(el => el.classList.toggle('hide-col', !showCoCode));
+        document.querySelectorAll('.col-tran').forEach(el => el.classList.toggle('hide-col', !showTran));
+    }
+
+    // ===== Pivot =====
+    const SUM_FIELDS = [
+        ["amountCoCode", "Amount (CoCode Crcy)"], ["baseCoCode", "Tax Base (CoCode)"], ["taxCoCode", "Calc Tax (CoCode)"],
+        ["whtBaseCoCode", "WHT Base (CoCode)"], ["whtAmtCoCode", "WHT Amount (CoCode)"], ["transferCoCode", "Transfer Amount (CoCode)"],
+        ["amountTran", "Amount (Tran Cur.)"], ["baseTran", "Tax Base (Tran)"], ["taxTran", "Calc Tax (Tran)"],
+        ["whtBaseTran", "WHT Base (Tran)"], ["whtAmtTran", "WHT Amount (Tran)"], ["transferTran", "Transfer Amount (Tran)"]
+    ];
+
+    function emptyTotals() {
+        const t = { count: 0 };
+        SUM_FIELDS.forEach(([k]) => t[k] = 0);
+        return t;
+    }
+
+    function addTotals(target, src) {
+        SUM_FIELDS.forEach(([k]) => target[k] += src[k]);
+        target.count += src.count;
+    }
+
+    function totalsToRow(label1, label2, t) {
+        return [label1, label2, t.count, ...SUM_FIELDS.map(([k]) => t[k])];
+    }
+
+    function generatePivotData(data) {
+        const pivotMap = {};
+        data.forEach(item => {
+            const cc = item["Company Code"] || "Unknown";
+            const key = `${item["Customer"] || "Unknown"} - ${item["Customer Name"] || "Unknown"}`;
+            if (!pivotMap[cc]) pivotMap[cc] = {};
+            if (!pivotMap[cc][key]) pivotMap[cc][key] = emptyTotals();
+            const p = pivotMap[cc][key];
+            SUM_FIELDS.forEach(([k, col]) => p[k] += parseFloat(item[col]) || 0);
+            p.count++;
+        });
+
+        const pivotRows = [];
+        const grandTotals = emptyTotals();
+
+        pivotRows.push({ type: 'header', values: [
+            "Company Code", "Customer (Code - Name)", "Count of Items",
+            "Sum of Amount (CoCode Crcy)", "Sum of Tax Base (CoCode)", "Sum of Calc Tax (CoCode)", "Sum of WHT Base (CoCode)", "Sum of WHT Amount (CoCode)", "Sum of Transfer Amt (CoCode)",
+            "Sum of Amount (Tran Cur.)", "Sum of Tax Base (Tran)", "Sum of Calc Tax (Tran)", "Sum of WHT Base (Tran)", "Sum of WHT Amount (Tran)", "Sum of Transfer Amt (Tran)"
+        ]});
+
+        for (const cc of Object.keys(pivotMap).sort()) {
+            const ccTotals = emptyTotals();
+            for (const key of Object.keys(pivotMap[cc]).sort()) {
+                const d = pivotMap[cc][key];
+                pivotRows.push({ type: 'data', values: totalsToRow(cc, key, d) });
+                addTotals(ccTotals, d);
+            }
+            pivotRows.push({ type: 'subtotal', values: totalsToRow(`Total ${cc}`, "", ccTotals) });
+            addTotals(grandTotals, ccTotals);
+        }
+
+        pivotRows.push({ type: 'grand', values: totalsToRow("Grand Total", "", grandTotals) });
+        return pivotRows;
+    }
+
+    function renderPivotScreen(data) {
+        const pivotArray = generatePivotData(data);
+
+        let html = `
+            <table class="pivot-table">
+                <thead>
+                    <tr>
+                        <th style="text-align: left; width: 150px;">Company Code</th>
+                        <th style="text-align: left; min-width: 300px;">Customer (Code - Name)</th>
+                        <th style="text-align: center; width: 100px;">Count</th>
+
+                        <th style="text-align: right;" class="col-cocode">Sum Amount (CoCode)</th>
+                        <th style="text-align: right;" class="col-cocode">Sum Base (CoCode)</th>
+                        <th style="text-align: right;" class="col-cocode">Sum Tax (CoCode)</th>
+                        <th style="text-align: right;" class="col-cocode">Sum WHT Base (CoCode)</th>
+                        <th style="text-align: right;" class="col-cocode">Sum WHT Amt (CoCode)</th>
+                        <th style="text-align: right; background-color: #b45309 !important;" class="col-cocode">Sum Transfer (CoCode)</th>
+
+                        <th style="text-align: right;" class="col-tran">Sum Amount (Tran)</th>
+                        <th style="text-align: right;" class="col-tran">Sum Base (Tran)</th>
+                        <th style="text-align: right;" class="col-tran">Sum Tax (Tran)</th>
+                        <th style="text-align: right;" class="col-tran">Sum WHT Base (Tran)</th>
+                        <th style="text-align: right;" class="col-tran">Sum WHT Amt (Tran)</th>
+                        <th style="text-align: right; background-color: #b45309 !important;" class="col-tran">Sum Transfer (Tran)</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        pivotArray.forEach(({ type, values: row }) => {
+            if (type === 'header') return;
+            const trClass = type === 'subtotal' ? 'pivot-subtotal-row' : type === 'grand' ? 'pivot-grandtotal-row' : '';
+            html += `<tr class="${trClass}">`;
+            html += `<td style="text-align: left;">${escapeHtml(row[0])}</td>`;
+            html += `<td style="text-align: left;">${escapeHtml(row[1] || '')}</td>`;
+            html += `<td style="text-align: center;">${row[2]}</td>`;
+            for (let i = 3; i <= 14; i++) {
+                const cls = i <= 8 ? 'col-cocode' : 'col-tran';
+                const style = (i === 8 || i === 14) ? 'text-align: right; font-weight: bold; color: #b45309;' : 'text-align: right;';
+                html += `<td style="${style}" class="${cls}">${formatNumber(row[i])}</td>`;
+            }
+            html += `</tr>`;
+        });
+
+        html += `</tbody></table>`;
+        document.getElementById('tableContainerPivot').innerHTML = html;
+        updateCurrencyView();
+    }
+
+    // ===== Export =====
+    async function exportToExcel() {
+        if (!processedExportData || processedExportData.length === 0) {
+            alert('ไม่มีข้อมูลสำหรับ Export');
+            return;
+        }
+
+        const btn = document.getElementById('btnExport');
+        btn.disabled = true;
+
+        try {
+            const workbook = new ExcelJS.Workbook();
+
+            const ws_detail = workbook.addWorksheet("Invoice_Detail");
+            const headersDetail = Object.keys(processedExportData[0]);
+            ws_detail.addRow(headersDetail);
+            processedExportData.forEach(row => ws_detail.addRow(headersDetail.map(h => row[h])));
+            applyExcelStyles(ws_detail, null);
+
+            const ws_pivot = workbook.addWorksheet("PIVOT");
+            const pivotArray = generatePivotData(processedExportData);
+            pivotArray.forEach(r => ws_pivot.addRow(r.values));
+            applyExcelStyles(ws_pivot, pivotArray.map(r => r.type));
+
+            const ws_original = workbook.addWorksheet("Original");
+            originalRawData.forEach(row => {
+                const added = ws_original.addRow(row);
+                added.eachCell(cell => { if (cell.value instanceof Date) cell.numFmt = 'dd.mm.yyyy'; });
+            });
+
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+            saveAs(blob, `Invoice_Detail_${SCOPE_INFO[lastProcessedScope].file}_Report_${formatDateStr(new Date())}.xlsx`);
+        } catch (err) {
+            alert('Export ไม่สำเร็จ: ' + err.message);
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    function applyExcelStyles(ws, rowTypes) {
+        const isPivot = Array.isArray(rowTypes);
+        const borderStyle = {
+            top: { style: 'thin', color: { argb: 'CBD5E1' } },
+            left: { style: 'thin', color: { argb: 'CBD5E1' } },
+            bottom: { style: 'thin', color: { argb: 'CBD5E1' } },
+            right: { style: 'thin', color: { argb: 'CBD5E1' } }
+        };
+
+        const headerRow = ws.getRow(1);
+        headerRow.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFF' } };
+        headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+        headerRow.height = 24;
+        headerRow.eachCell((cell) => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '1E3A8A' } };
+            cell.border = borderStyle;
+        });
+
+        ws.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return;
+            const type = isPivot ? rowTypes[rowNumber - 1] : 'data';
+            row.eachCell((cell, colNumber) => {
+                cell.border = borderStyle;
+                cell.font = { name: 'Calibri', size: 10 };
+                if (typeof cell.value === 'number') {
+                    cell.numFmt = (isPivot && colNumber === 3) ? '#,##0' : '#,##0.00';
+                }
+                if (type === 'subtotal') {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'DBEAFE' } };
+                    cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: '1E3A8A' } };
+                } else if (type === 'grand') {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '1E293B' } };
+                    cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFF' } };
+                }
+            });
+        });
+
+        ws.columns.forEach(column => {
+            let maxLen = 12;
+            column.eachCell({ includeEmpty: true }, cell => {
+                const len = cell.value ? String(cell.value).length : 0;
+                if (len > maxLen) maxLen = len;
+            });
+            column.width = Math.min(maxLen + 4, 35);
+        });
+        ws.views = [{ state: 'frozen', ySplit: 1 }];
+    }
+
+    // init
+    buildFilterFields();
+    updateSdScopeUI();
+</script>
+
+</body>
+</html>
